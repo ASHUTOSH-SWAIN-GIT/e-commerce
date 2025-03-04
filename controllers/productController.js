@@ -1,34 +1,47 @@
 const Product = require('../models/product');
 const User = require('../models/users');
+const mongoose = require('mongoose');
 
 // @desc    Add a new product (Only seller can add)
 // @route   POST /api/products/add
 // @access  Seller only
 const addProduct = async (req, res) => {
-  try {
-    const { username, description, price, category, stock, sellerId } = req.body;
-
-    // Check if sellerId exists and is a seller
-    const seller = await User.findById(sellerId);
-    if (!seller || seller.role !== 'seller') {
-      return res.status(403).json({ message: 'Invalid seller ID. Only sellers can add products' });
+    try {
+      const { name, description, price, category, stock, sellerId } = req.body;
+  
+      // Validate required fields
+      if (!name || !price || !sellerId) {
+        return res.status(400).json({ message: 'Name, price, and sellerId are required' });
+      }
+  
+      // Validate sellerId
+      if (!mongoose.Types.ObjectId.isValid(sellerId)) {
+        return res.status(400).json({ message: 'Invalid seller ID' });
+      }
+  
+      // Check if sellerId exists and is a seller
+      const seller = await User.findById(sellerId);
+      if (!seller || seller.role !== 'seller') {
+        return res.status(403).json({ message: 'Invalid seller ID. Only sellers can add products' });
+      }
+  
+      // Create new product
+      const product = new Product({
+        name, // Changed from username to name
+        description,
+        price,
+        category,
+        stock,
+        seller: sellerId // Assign seller's ID to the product
+      });
+  
+      await product.save();
+      res.status(201).json({ message: 'Product added successfully', product });
+    } catch (error) {
+      console.error(error); // Log error for debugging
+      res.status(500).json({ message: error.message });
     }
-
-    const product = new Product({
-      username,
-      description,
-      price,
-      category,
-      stock,
-      seller: sellerId, // Assign seller's ID to the product
-    });
-
-    await product.save();
-    res.status(201).json({ message: 'Product added successfully', product });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+  };
 
 // @desc    Update product (Only seller who owns it can update)
 // @route   PUT /api/products/:id

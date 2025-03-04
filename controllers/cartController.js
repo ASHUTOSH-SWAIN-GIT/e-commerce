@@ -108,21 +108,21 @@ const removeFromCart = async (req, res) => {
 
 const checkoutCart = async (req, res) => {
     try {
-        const { username } = req.body; // Get username from request body
+        const { username, couponCode } = req.body; // Get username & optional coupon code
 
         if (!username) {
             return res.status(400).json({ message: "Username is required" });
         }
 
         // Find the user by username
-        const foundUser = await user.findOne({ username });
+        const foundUser = await User.findOne({ username });
         if (!foundUser) {
             return res.status(404).json({ message: "User not found" });
         }
 
         // Check if the user is a buyer
-        if (foundUser.role !== 'buyer') {
-            return res.status(403).json({ message: "Access denied. Only buyers can checkout" });
+        if (foundUser.role !== "buyer") {
+            return res.status(403).json({ message: "Only buyers can checkout" });
         }
 
         // Fetch the cart for the buyer
@@ -132,7 +132,23 @@ const checkoutCart = async (req, res) => {
         }
 
         // Calculate total price of items in the cart
-        const totalPrice = cart.products.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
+        let totalPrice = cart.products.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
+
+        // Apply discount if a valid coupon code is provided
+        if (couponCode) {
+            const coupon = await Coupon.findOne({ code: couponCode });
+
+            if (!coupon) {
+                return res.status(400).json({ message: "Invalid coupon code" });
+            }
+
+            if (coupon.expirationDate < new Date()) {
+                return res.status(400).json({ message: "Coupon has expired" });
+            }
+
+            totalPrice -= coupon.discount; // Apply discount
+            totalPrice = totalPrice < 0 ? 0 : totalPrice; // Prevent negative total
+        }
 
         // Check if the user has enough balance
         if (foundUser.balance < totalPrice) {
