@@ -6,7 +6,7 @@ const User = require('../models/users');
 // @access  Seller only
 const addProduct = async (req, res) => {
   try {
-    const { name, description, price, category, stock, sellerId } = req.body;
+    const { username, description, price, category, stock, sellerId } = req.body;
 
     // Check if sellerId exists and is a seller
     const seller = await User.findById(sellerId);
@@ -15,7 +15,7 @@ const addProduct = async (req, res) => {
     }
 
     const product = new Product({
-      name,
+      username,
       description,
       price,
       category,

@@ -7,6 +7,6 @@ const router = express.Router();
 router.get("/", protect, isBuyer, getCart); // View Cart
 router.post("/add", protect, isBuyer, addToCart); // Add Product
 router.delete("/remove/:productId", protect, isBuyer, removeFromCart); // Remove Product
-router.post("/checkout", protect, isBuyer, checkoutCart); // Checkout
+router.post("/checkout", checkoutCart); // Checkout
 
 module.exports = router;
