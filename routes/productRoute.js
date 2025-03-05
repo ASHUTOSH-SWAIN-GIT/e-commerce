@@ -13,10 +13,10 @@ router.get('/', getAllProducts);
 router.get('/:id', getProductById);
 
 // Update product (Only seller who added it)
-router.put('/:id', protect, isSeller, updateProduct);
+router.put('/update/:id', protect, isSeller, updateProduct);
 
 // Delete product (Only seller who added it)
-router.delete('/:id', protect, isSeller, deleteProduct);
+router.delete('/delete/:id', protect, isSeller, deleteProduct);
 
 
 router.get('/category/:category', getProductsByCategory);

@@ -1,7 +1,8 @@
 const Cart = require("../models/cart");
-const Product = require("../models/product")
-const user = require("../models/users")
+const product = require("../models/product")
+const User = require("../models/users")
 const mongoose = require("mongoose");
+const Coupon = require("../models/coupon");
 
 // @desc    Get buyer's cart
 // @route   GET /api/cart/
@@ -115,7 +116,7 @@ const checkoutCart = async (req, res) => {
         }
 
         // Find the user by username
-        const foundUser = await User.findOne({ username });
+        const foundUser = await User.findOne({ username }); // Capitalized User
         if (!foundUser) {
             return res.status(404).json({ message: "User not found" });
         }
@@ -131,23 +132,41 @@ const checkoutCart = async (req, res) => {
             return res.status(400).json({ message: "Your cart is empty" });
         }
 
-        // Calculate total price of items in the cart
-        let totalPrice = cart.products.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
+        // Calculate total price with safety check
+        let totalPrice = cart.products.reduce((acc, item) => {
+            const price = item.product && typeof item.product.price === 'number' ? item.product.price : 0;
+            return acc + (price * item.quantity);
+        }, 0);
+
+        console.log(`Original Total Price: ${totalPrice}`);
+
+        // Initialize discount amount
+        let discountAmount = 0;
 
         // Apply discount if a valid coupon code is provided
         if (couponCode) {
-            const coupon = await Coupon.findOne({ code: couponCode });
-
-            if (!coupon) {
+            // Fetch the coupon from the database
+            const existingCoupon = await Coupon.findOne({ code: couponCode }); // Capitalized Coupon
+            if (!existingCoupon) {
                 return res.status(400).json({ message: "Invalid coupon code" });
             }
 
-            if (coupon.expirationDate < new Date()) {
+            if (existingCoupon.expirationDate < new Date()) {
                 return res.status(400).json({ message: "Coupon has expired" });
             }
 
-            totalPrice -= coupon.discount; // Apply discount
-            totalPrice = totalPrice < 0 ? 0 : totalPrice; // Prevent negative total
+            discountAmount = existingCoupon.discount || 0; // Default to 0 if discount is undefined
+            totalPrice -= discountAmount;
+
+            // Ensure total price doesn't go negative
+            if (totalPrice < 0) totalPrice = 0;
+
+            console.log(`Discount Applied: ${discountAmount}, New Total Price: ${totalPrice}`);
+        }
+
+        // Validate totalPrice is a number
+        if (isNaN(totalPrice) || totalPrice < 0) {
+            return res.status(500).json({ message: "Invalid total price calculation" });
         }
 
         // Check if the user has enough balance
@@ -161,6 +180,12 @@ const checkoutCart = async (req, res) => {
 
         // Deduct total price from user balance
         foundUser.balance -= totalPrice;
+
+        // Validate balance is still a number after deduction
+        if (isNaN(foundUser.balance)) {
+            return res.status(500).json({ message: "Error updating balance" });
+        }
+
         await foundUser.save();
 
         // Empty the cart after successful checkout
@@ -168,12 +193,12 @@ const checkoutCart = async (req, res) => {
 
         res.json({
             message: "Checkout successful!",
+            discountApplied: discountAmount,
             remainingBalance: foundUser.balance,
             totalSpent: totalPrice
         });
-
     } catch (error) {
-        console.error(error);
+        console.error("Error in checkout:", error);
         res.status(500).json({ message: error.message });
     }
 };
